@@ -5,7 +5,7 @@
   vars:
     - java_version: openjdk-11-jdk
     - home: /opt/tomcat
-    - tomcat_version:'9.0.62'
+    - tomcat_version: '9.0.62'
     - user_name: tomcat
   tasks:
     - name: install java
@@ -38,6 +38,7 @@
         recurse: yes
         owner: "{{ user_name }}" 
         group: "{{ user_name }}"
+        mode: '0751'
     - name: find .sh file
       find:
         path: "{{ home }}/latest/bin/" 
@@ -48,27 +49,27 @@
     - name: chnage permission
       ansible.builtin.file:
         path: "{{ item }}"
-        mode: 0751
+        mode: '0751'
       with_items: "{{ tomcat_executables }}"  
     - name: create a tomcat.service
       ansible.builtin.copy:
-        src: /home/ubuntu/Nop/openmrs/tomcat.service
+        src: /home/ubuntu/openmrs/tomcat.service
         dest: /etc/systemd/system/tomcat.service  
     - name: start service  
-      ansible.builtin.service:
-        name: /home/ubuntu/Nop/openmrs/tomcat.service
+      ansible.builtin.systemd:
+        name: tomcat.service 
         state: started
     - name: create new tomcat user
       ansible.builtin.copy:
-        src: /home/ubuntu/Nop/openmrs/users.xml
+        src: /home/ubuntu/openmrs/users.xml
         dest: "{{ home }}/latest/conf/tomcat-users.xml"
     - name: configure manager 
       ansible.builtin.copy:
-        src:  /home/ubuntu/Nop/openmrs/manger.xml
+        src:  /home/ubuntu/openmrs/manger.xml
         dest: "{{ home }}/latest/webapps/manager/META-INF/context.xml"
     - name: configure host manager 
       ansible.builtin.copy:
-        src:  /home/ubuntu/Nop/openmrs/hostmgr.xml
+        src:  /home/ubuntu/openmrs/hostmgr.xml
         dest: "{{ home }}/latest/webapps/host-manager/META-INF/context.xml"
     - name: download openmrs
       get_url:
@@ -81,5 +82,4 @@
       ansible.builtin.systemd:
         name: tomcat.service
         daemon_reload: yes
-        enabled: yes
         state: restarted 
