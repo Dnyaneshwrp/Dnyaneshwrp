@@ -1,0 +1,85 @@
+---
+- name: install tomcat9
+  hosts: all
+  become: yes
+  vars:
+    - java_version: openjdk-11-jdk
+    - home: /opt/tomcat
+    - tomcat_version:'9.0.62'
+    - user_name: tomcat
+  tasks:
+    - name: install java
+      apt:
+        name: "{{ java_version }}"
+        update_cache: yes
+    - name: add user tomcat
+      ansible.builtin.user:
+        name: "{{ user_name }}" 
+        home: "{{ home }}"
+        shell: /bin/false
+    - name: download tomcat
+      get_url:
+        url: "https://dlcdn.apache.org/tomcat/tomcat-9/v{{ tomcat_version }}/bin/apache-tomcat-{{ tomcat_version }}.tar.gz"
+        dest: "/tmp/apache-tomcat-{{ tomcat_version }}.tar.gz"
+    - name: unarchive tomcat
+      ansible.builtin.unarchive:
+        src: "/tmp/apache-tomcat-{{ tomcat_version }}.tar.gz"
+        dest: "{{ home }}" 
+        remote_src: yes
+    - name: create a symbolic link 
+      ansible.builtin.file:  
+         src: "{{ home }}/apache-tomcat-{{ tomcat_version }}"
+         dest: "{{ home }}/latest"
+         state: link
+    - name: give ownership to tomcat user and group
+      ansible.builtin.file:
+        path: "{{ home }}"
+        state: directory
+        recurse: yes
+        owner: "{{ user_name }}" 
+        group: "{{ user_name }}"
+    - name: find .sh file
+      find:
+        path: "{{ home }}/latest/bin/" 
+        pattern: "*.sh"
+      register: shfiles
+    - set_fact:
+        tomcat_executables: "{{ shfiles.files | map(attribute= 'path') | list }}"
+    - name: chnage permission
+      ansible.builtin.file:
+        path: "{{ item }}"
+        mode: 0751
+      with_items: "{{ tomcat_executables }}"  
+    - name: create a tomcat.service
+      ansible.builtin.copy:
+        src: /home/ubuntu/Nop/openmrs/tomcat.service
+        dest: /etc/systemd/system/tomcat.service  
+    - name: start service  
+      ansible.builtin.service:
+        name: /home/ubuntu/Nop/openmrs/tomcat.service
+        state: started
+    - name: create new tomcat user
+      ansible.builtin.copy:
+        src: /home/ubuntu/Nop/openmrs/users.xml
+        dest: "{{ home }}/latest/conf/tomcat-users.xml"
+    - name: configure manager 
+      ansible.builtin.copy:
+        src:  /home/ubuntu/Nop/openmrs/manger.xml
+        dest: "{{ home }}/latest/webapps/manager/META-INF/context.xml"
+    - name: configure host manager 
+      ansible.builtin.copy:
+        src:  /home/ubuntu/Nop/openmrs/hostmgr.xml
+        dest: "{{ home }}/latest/webapps/host-manager/META-INF/context.xml"
+    - name: download openmrs
+      get_url:
+        url: https://sourceforge.net/projects/openmrs/files/releases/OpenMRS_Platform_2.5.0/openmrs.war 
+        dest: "{{ home }}/apache-tomcat-{{ tomcat_version }}/webapps/openmrs.war"
+      notify:
+        - reload and enable tomcat
+  handlers:
+    - name: reload and enable tomcat
+      ansible.builtin.systemd:
+        name: tomcat.service
+        daemon_reload: yes
+        enabled: yes
+        state: restarted 

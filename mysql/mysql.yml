@@ -1,0 +1,51 @@
+---
+- name: install mysql
+  hosts: all
+  become: yes
+  tasks:
+    - name: Installing apt dependencies
+      apt:
+        name: "{{ item }}"
+        state: present
+        update-cache: yes
+      with_items:
+        - python-dev
+        - libmysqlclient-dev
+        - python3-pip
+        - python3-mysqldb
+        - python3
+    - name: Install pip
+      apt:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - pip
+    - name: install mysql
+      apt:
+        pkg: mysql-server
+        state: present
+        update_cache: yes
+    - name: start service
+      ansible.builtin.service:
+        name: mysql.service
+        state: started
+        enabled: yes
+    - name: create mysql user
+      community.mysql.mysql_user:
+        name: dny
+        password: Dny@1234
+        state: present
+        host: '%'
+        priv: '*.*:ALL'
+    - name: Reload privilege tables
+      command: 'mysql -ne "{{ item }}"'
+      with_items:
+        - FLUSH PRIVILEGES
+      changed_when: False
+    - name: changing bind-address
+      ansible.builtin.replace:
+        path: /etc/mysql/mysql.conf.d/mysqld.cnf 
+        regexp: 127.0.0.1  
+        replace: 0.0.0.0 
+    
+     

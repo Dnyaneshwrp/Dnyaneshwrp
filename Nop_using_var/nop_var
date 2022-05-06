@@ -1,0 +1,108 @@
+---
+- name: install nop
+  hosts: all
+  become: yes
+  vars: 
+    debian_packages: https://packages.microsoft.com/config/ubuntu/20.04/packages-microsoft-prod.deb
+    install_deb_pack: /tmp/packages-microsoft-prod.deb
+    install_dotnet: aspnetcore-runtime-6.0 
+    reproxy_path: /etc/nginx/sites-available/default
+    directory: /var/www/nopCommerce450
+    nopservice_file: /etc/systemd/system/nopCommerce450.service 
+    zip_nop: /var/www/nopCommerce450/nopCommerce_4.50.2_NoSource_linux_x64.zip
+    download_nop: https://github.com/nopSolutions/nopCommerce/releases/download/release-4.50.2/nopCommerce_4.50.2_NoSource_linux_x64.zip   
+  tasks:
+    - name: download debian packages
+      get_url:
+        url: "{{ debian_packages }}"
+        dest: "{{ install_deb_pack }}"
+    - name: install debian packages
+      apt:
+        deb: "{{ install_deb_pack }}"
+    - name: install dotnet https
+      apt:
+        name: apt-transport-https
+        state: latest
+        update_cache: yes
+    - name: install dotnet  
+      apt:
+        name: "{{ install_dotnet }}"
+        state: latest
+        update_cache: yes
+    - name: install nginx
+      apt:
+        name: nginx  
+        state: latest
+        update_cache: yes
+      notify: 
+        - restart nginx 
+    - name: Add a line to reverse proxy
+      ansible.builtin.lineinfile:
+        path: "{{ reproxy_path }}"
+        insertbefore: '# First attempt to serve request as file, then'
+        line: "{{ item }}"
+        create: no
+        state: absent
+      with_items:
+        - 'location / {'
+        - 'proxy_pass http://localhost:5000;'
+        - 'proxy_http_version 1.1;'
+        - 'proxy_set_header   Upgrade $http_upgrade;'
+        - 'proxy_set_header   Connection keep-alive;'
+        - 'proxy_set_header   Host $host;'
+        - 'proxy_cache_bypass $http_upgrade;'
+        - 'proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;'
+        - 'proxy_set_header   X-Forwarded-Proto $scheme;'
+        - '}'
+    - name: create directory
+      ansible.builtin.file:
+        path: "{{ directory }}"
+        state: directory
+        mode: '0755'  
+    - name: download nop  
+      get_url: 
+        url:  "{{ download_nop }}" 
+        dest: "{{ directory }}"
+    - name: install unzip
+      apt:
+        name: unzip 
+        state: latest
+        update_cache: yes 
+    - name:  unzip nopCommerce
+      ansible.builtin.unarchive:
+        src: "{{ zip_nop }}"
+        dest: "{{ directory }}"
+    - name: Create a directory bin 
+      ansible.builtin.file:
+        path: "{{ directory }}/bin"
+        state: directory
+        mode: '0755'
+    - name: Create a directory logs
+      ansible.builtin.file:
+        path: "{{ directory }}/logs"
+        state: directory
+        mode: '0755'  
+    - name: Change file ownership, group and permissions
+      ansible.builtin.file:
+        path: "{{ directory }}"
+        state: directory
+        recurse: yes  
+        owner: root
+        group: root
+        mode: '0755' 
+    - name: create service file 
+      ansible.builtin.copy:
+        src: /home/ubuntu/nop/nop.service
+        dest: /etc/systemd/system/nopCommerce450.service  
+    - name: restart nop 
+      ansible.builtin.service:
+        name: nopCommerce450.service
+        state: started
+  handlers:
+    - name: restart nginx 
+      ansible.builtin.service:
+        name: nginx
+        state: restarted
+    
+      
+    
