@@ -1,0 +1,6 @@
+---
+# vars file for sample
+java_version: openjdk-11-jdk
+home: /opt/tomcat
+tomcat_version: '9.0.62'
+user_name: tomcat
