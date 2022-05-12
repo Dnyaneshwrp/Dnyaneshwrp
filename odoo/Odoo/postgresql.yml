@@ -1,0 +1,113 @@
+---
+- name: install odoo
+  hosts: all
+  become: yes
+  tasks:
+    - name: Odoo clone  
+      ansible.builtin.git:
+        repo: https://github.com/odoo/odoo.git 
+        dest: /home/ubuntu/odoo
+        clone: yes
+    - name: install pip3
+      ansible.builtin.package:
+        name: python3-pip
+        state: latest
+    - name: Install postgresql  
+      ansible.builtin.package:
+        name: "{{ item }}" 
+        state: present
+      with_items:
+        - postgresql
+        - postgresql-contrib
+        - postgresql-client
+        - python3-psycopg2
+        - python3-dev
+        - libpq-dev
+    - name: Install o psycopg2
+      become: yes
+      pip:
+        name: psycopg2-binary
+        executable: pip3
+    - name: postgresql.conf 
+      ansible.builtin.replace:
+        path: /etc/postgresql/12/main/postgresql.conf
+        regexp: "#listen_addresses = 'localhost'"
+        replace: " listen_addresses = '*' "
+    - name: pg_hba.conf
+      ansible.builtin.copy: 
+        src: pg_hba.conf 
+        dest: /etc/postgresql/12/main/pg_hba.conf  
+    - name: Start service  
+      ansible.builtin.service:
+        name: postgresql
+        state: restarted
+    - name: create DB
+      postgresql_db:
+        name: sammydb
+        owner: postgresql
+        port: 5432 
+        state: present
+    - name: Create user in ansible
+      community.postgresql.postgresql_user:
+        db: sammydb
+        name: postgresql
+        priv: ALL
+        port: 5432
+        state: present 
+    - name: Install python3 dependencies 
+      ansible.builtin.package:
+        name: "{{ item }}" 
+        state: present
+      with_items:
+        - python3-dev
+        - libxml2-dev 
+        - libxslt1-dev 
+        - libldap2-dev 
+        - libsasl2-dev
+        - libtiff5-dev
+        - libjpeg8-dev
+        - libopenjp2-7-dev 
+        - zlib1g-dev 
+        - libfreetype6-dev 
+        - liblcms2-dev
+        - libwebp-dev
+        - libharfbuzz-dev 
+        - libfribidi-dev 
+        - libxcb1-dev 
+        - libpq-dev
+    - name: Create a directory if it does not exist
+      ansible.builtin.file:
+        path: /home/ubuntu/CommunityPath
+        state: directory
+        mode: '0755'
+    - name:  
+      pip:
+        name: "{{ item }}" 
+        state: present
+        chdir: /home/ubuntu/CommunityPath 
+      with_items:
+        - setuptools 
+        - wheel
+    - name: Install specified python requirements
+      pip:
+        requirements: /home/ubuntu/odoo/requirements.txt
+    - name: Install npm and nodjs
+      ansible.builtin.package:
+        name: "{{ item }}" 
+        state: present
+      with_items:
+        - nodejs  
+        - npm 
+        - build-essential
+    - name: Install rtlcss 
+      community.general.npm:
+        name: rtlcss 
+        global: yes 
+    - name: install odoo  
+      ansible.builtin.command: python3 odoo-bin --addons-path=addons -d mydb  
+      args:
+       chdir: /home/ubuntu/odoo
+        
+    
+
+        

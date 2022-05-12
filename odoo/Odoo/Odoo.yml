@@ -1,0 +1,51 @@
+---
+- name: install odoo
+  hosts: all
+  become: yes
+  tasks:
+    - name: Odoo clone  
+      ansible.builtin.git:
+        repo: https://github.com/odoo/odoo.git 
+        dest: /home/ubuntu/odoo
+        clone: yes
+        update: no
+    - name: install pip3
+      ansible.builtin.package:
+        name: python3-pip
+        state: latest
+        use: auto
+    - name: Install postgresql  
+      ansible.builtin.package:
+        name: "{{ item }}" 
+        state: present
+      with_items:
+        - postgresql-client
+        - postgresql
+        - libpq-dev
+        - postgresql-contrib
+        - libxslt-dev
+        - python3-psycopg2
+        - python-dev 
+    - name: give permission to all user in pg_hba.conf 
+      ansible.builtin.lineinfile:
+        path: /etc/postgresql/12/main/pg_hba.conf 
+        line: local    all             all             0.0.0.0/0                md5 
+        create: yes
+    - name: update listen address in postgresql.conf
+      ansible.builtin.replace:
+        path: /etc/postgresql/12/main/postgresql.conf 
+        regexp: #listen_addresses = 'localhost' 
+        replace: listen_addresses = '*'
+    - name: Start the database service
+      service:
+        name: postgresql
+        state: started
+    - name: PostgreSQL users
+      postgresql_user:
+        login_user: postgresql
+        name: postgres
+        port: 5432
+
+        
+
+    
